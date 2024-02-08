@@ -1,57 +1,99 @@
-import DeployButton from "../components/DeployButton";
-import AuthButton from "../components/AuthButton";
-import { createClient } from "@/utils/supabase/server";
-import ConnectSupabaseSteps from "@/components/ConnectSupabaseSteps";
-import SignUpUserSteps from "@/components/SignUpUserSteps";
-import Header from "@/components/Header";
-import { cookies } from "next/headers";
+import AreaChartUsageExampleWithClickEvent from "@/components/AreaChart";
+import {
+  getActiveUsersByDay,
+  getActiveUsersByMonth,
+  getActiveUsersByWeek,
+} from "@/utils/db/queries";
+import { AreaChart, Card, Grid, Metric, Text, Title } from "@tremor/react";
+import { Row } from "postgres";
 
 export default async function Index() {
-  const cookieStore = cookies();
+  const dailyResults = await getActiveUsersByDay();
+  const weeklyResults = await getActiveUsersByWeek();
+  const monthlyResults = await getActiveUsersByMonth();
 
-  const canInitSupabaseClient = () => {
-    // This function is just for the interactive tutorial.
-    // Feel free to remove it once you have Supabase connected.
-    try {
-      createClient(cookieStore);
-      return true;
-    } catch (e) {
-      return false;
-    }
+  if (!dailyResults) {
+    return <div>Loading...</div>;
+  }
+
+  type DailyResult = {
+    date: string;
+    active_users: number;
   };
 
-  const isSupabaseConnected = canInitSupabaseClient();
+  type WeeklyResult = {
+    week: number;
+    active_users: number;
+  };
 
+  type MonthlyResult = {
+    month: number;
+    active_users: number;
+  };
+
+  const todayResult = dailyResults.find((result) => {
+    const date = new Date(result.day);
+    const today = new Date();
+    console.log(date, today);
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  });
+
+  const thisWeekResult = weeklyResults.find((result) => {
+    const today = new Date();
+    const onejan = new Date(today.getFullYear(), 0, 1);
+    const week = Math.ceil(
+      ((today.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) /
+        7
+    );
+    console.log(week);
+    return result.week == week;
+  });
+
+  const thisMonthResult = monthlyResults.find((result) => {
+    const today = new Date();
+    return result.month == today.getMonth() + 1;
+  });
+
+  const date = new Date();
+  const hour = date.getHours();
+  let timeOfDay = "morning";
+  if (hour >= 12 && hour < 17) {
+    timeOfDay = "afternoon";
+  } else if (hour >= 17) {
+    timeOfDay = "evening";
+  }
   return (
-    <div className="flex-1 w-full flex flex-col gap-20 items-center">
-      <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-        <div className="w-full max-w-4xl flex justify-between items-center p-3 text-sm">
-          <DeployButton />
-          {isSupabaseConnected && <AuthButton />}
-        </div>
-      </nav>
-
-      <div className="animate-in flex-1 flex flex-col gap-20 opacity-0 max-w-4xl px-3">
-        <Header />
-        <main className="flex-1 flex flex-col gap-6">
-          <h2 className="font-bold text-4xl mb-4">Next steps</h2>
-          {isSupabaseConnected ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-        </main>
-      </div>
-
-      <footer className="w-full border-t border-t-foreground/10 p-8 flex justify-center text-center text-xs">
-        <p>
-          Powered by{" "}
-          <a
-            href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-            target="_blank"
-            className="font-bold hover:underline"
-            rel="noreferrer"
-          >
-            Supabase
-          </a>
+    <div className="mx-auto max-w-4xl py-12 space-y-10">
+      <header className="">
+        <h1 className="mt-4 text-4xl font-bold ">Good {timeOfDay}!</h1>
+        <p className="mt-2 text-gray-500">
+          Here's a quick look at what's user data of your supabase project (Time
+          is in UTC.)
         </p>
-      </footer>
+      </header>
+
+      <Grid numItemsMd={2} numItemsLg={3} className="gap-6 mt-6">
+        <Card className="space-y-2">
+          <Title>Active today</Title>
+          <Metric>{todayResult?.active_users || 0}</Metric>
+          {/* <Text>0% vs yesterday</Text> */}
+        </Card>
+        <Card className="space-y-2">
+          <Title>Active this week</Title>
+          <Metric>{thisWeekResult?.active_users || 0}</Metric>
+          {/* <Text>0% vs last week</Text> */}
+        </Card>
+        <Card className="space-y-2">
+          <Title>Active this month</Title>
+          <Metric>{thisMonthResult?.active_users || 0}</Metric>
+          {/* <Text>0% vs last month</Text> */}
+        </Card>
+      </Grid>
+      <AreaChartUsageExampleWithClickEvent />
     </div>
   );
 }
