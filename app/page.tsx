@@ -1,11 +1,10 @@
-import AreaChartUsageExampleWithClickEvent from "@/components/AreaChart";
+import AreaChartWithClick from "@/components/AreaChart";
 import {
   getActiveUsersByDay,
   getActiveUsersByMonth,
   getActiveUsersByWeek,
 } from "@/utils/db/queries";
-import { AreaChart, Card, Grid, Metric, Text, Title } from "@tremor/react";
-import { Row } from "postgres";
+import { Card, Grid, Metric, Title } from "@tremor/react";
 
 export default async function Index() {
   const dailyResults = await getActiveUsersByDay();
@@ -19,6 +18,8 @@ export default async function Index() {
   type DailyResult = {
     date: string;
     active_users: number;
+    new_users: number;
+    returning_users: number;
   };
 
   type WeeklyResult = {
@@ -34,7 +35,6 @@ export default async function Index() {
   const todayResult = dailyResults.find((result) => {
     const date = new Date(result.day);
     const today = new Date();
-    console.log(date, today);
     return (
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
@@ -49,7 +49,6 @@ export default async function Index() {
       ((today.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) /
         7
     );
-    console.log(week);
     return result.week == week;
   });
 
@@ -66,6 +65,37 @@ export default async function Index() {
   } else if (hour >= 17) {
     timeOfDay = "evening";
   }
+
+  // Get the dates of the past week but in chronological order
+  const datesInPastWeek = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    return date;
+  });
+  datesInPastWeek.reverse();
+
+  const chartData = datesInPastWeek.map((date) => {
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    const dateString = `${date.toLocaleString("default", {
+      month: "short",
+    })} ${date.getDate()}`;
+    const dailyResult = dailyResults.find((result) => {
+      const resultDate = new Date(result.day);
+      return (
+        resultDate.getDate() === day &&
+        resultDate.getMonth() + 1 === month &&
+        resultDate.getFullYear() === year
+      );
+    });
+    return {
+      date: dateString,
+      new: dailyResult?.new_users || 0,
+      returning: dailyResult?.returning_users || 0,
+    };
+  });
+
   return (
     <div className="mx-auto max-w-4xl py-12 space-y-10">
       <header className="">
@@ -93,7 +123,7 @@ export default async function Index() {
           {/* <Text>0% vs last month</Text> */}
         </Card>
       </Grid>
-      <AreaChartUsageExampleWithClickEvent />
+      <AreaChartWithClick chartData={chartData} />
     </div>
   );
 }
